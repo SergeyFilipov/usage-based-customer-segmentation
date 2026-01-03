@@ -1,125 +1,98 @@
 📊 Telecom Customer Segmentation & Satisfaction Analysis
-Behavioral segmentation of telecom customers based on real usage data (CallMinutes, SMSCount, DataUsage) and demographic variables (Gender, Lifestage, PlanType). Includes preprocessing, KMeans/K-Modes clustering, demographic profiling, NPS survey analysis, and marketing recommendations.
-The project is fully written in Python (pandas, numpy, sklearn, matplotlib, seaborn) and structured for reproducibility.
+
+Behavioral segmentation of telecom customers based on real usage data and demographics, combined with NPS/satisfaction survey analysis. The workflow includes data cleaning, feature binning, K-Modes clustering per service, final integrated clustering, demographic profiling, and satisfaction analysis.
+
+Written entirely in R using dplyr, tidyr, ggplot2, klaR, corrplot, stringr, and readr.
 
 📁 Project Structure
-data/           – raw input data (usage logs, demographic info, survey responses)
-output/         – processed datasets, plots, cluster visualizations
-src/            – core scripts for preprocessing, clustering, analysis
+data/           – Digital_2015_2016.RData (raw telecom data)
+output/         – processed datasets, plots, cluster summaries
+src/            – R scripts: analysis, clustering, NPS processing
 README.md       – project documentation
 
-🔢 Block 1: Load required packages and dataset
-📄 src/analysis.py
-Load necessary libraries (pandas, numpy, sklearn, matplotlib, seaborn)
-Load usage data, demographics, and survey responses
-Inspect missing values and duplicates
+🔢 Block 01: Load libraries & data
+Load required packages: dplyr, tidyr, ggplot2, klaR, corrplot, stringr, readr
+Remove all objects from environment (rm(list = ls()))
+Load dataset Digital_2015_2016.RData → df
+Inspect dimensions
+load("Digital_2015_2016.RData")
+df <- dd
+df_orig <- df
+dim(df)
 
-import pandas as pd
-import numpy as np
-from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.cluster import KMeans
-import matplotlib.pyplot as plt
-import seaborn as sns
+🔢 Block 02: Data Cleaning
+Remove rows with all key service flags missing (CUS_FL_MTEL, CUS_FL_INT, CUS_FL_DTV, CUS_FL_TEL)
+Keep latest record per customer
+Filter out business customers (CUS_SEX != "Business")
+Extract year/month/quarter variables from MONTH_CODE
 
+🔢 Block 03: Create column groups per service
+Identify DTV, INT, MTEL, TEL columns using prefixes
+Check datatypes for active vs inactive service users
 
-📥 Input files:
-telecom_usage.csv – call, SMS, and data usage
-demographics.csv – gender, age, lifestage, plan type
-survey_responses.csv – NPS and service feedback
+🔢 Block 04: Impute missing values for active users
+Replace NAs with 0 for active service users (per service flag)
+Keep only numeric features
+Add time variables (Year, MONTH, QUARTER, Year_Quarter)
+Summarize numeric columns by service group and flag:
+NaN (flag=0), NaN (flag=1), Zero values (flag=1), Non-null >0 (flag=1)
 
-✅ Ensures a clean starting point for preprocessing and clustering.
+🔢 Block 05: Correlation & Outlier Check
+Correlation matrix for main usage features (MTEL_VOICE_MOU, MTEL_TOT_VOL_MB, TEL_OUT_MOU, DTV_VIEW_NBR, etc.)
+Boxplots for key features to visualize outliers
 
-🔢 Block 2: Data preprocessing
+🔢 Block 06: Feature binning
+Binning based on usage distribution and business logic:
+MTEL: MTEL_VOICE_CNT_BIN, MTEL_TOT_VOL_MB_BIN
+TEL: TEL_OUT_MOU_BIN
+DTV: DTV_VIEW_NBR_BIN, DTV_NR_VOD_1YR_BIN
+INT: INT_VOL_DOWN_BIN, INT_VOL_STREAMING_BIN, INT_VOL_UP_BIN, INT_VOL_TOT_BIN
+Levels: Zero user, Low, Medium, High, Very High, no user
+Plots: histograms and barplots per bin
 
-📄 src/analysis.py
-Handle missing values (imputation or removal depending on feature)
-Drop duplicate records; keep latest usage snapshot per customer
-Convert categorical variables to numeric or factor encodings (Gender, PlanType)
-Scale continuous usage variables (CallMinutes, SMSCount, DataUsage)
+🔢 Block 07: Prepare binned dataframe
+Combine original and binned features for clustering
+Summarize binned features (NA count, zero user, no user)
+Dictionary of binned columns per service group for K-Modes
 
-df['Gender'] = df['Gender'].map({'Male': 1, 'Female': 2})
-df['PlanType'] = LabelEncoder().fit_transform(df['PlanType'])
-scaler = StandardScaler()
-df[['CallMinutes', 'SMSCount', 'DataUsage']] = scaler.fit_transform(df[['CallMinutes', 'SMSCount', 'DataUsage']])
+🔢 Block 08: K-Modes clustering per service group
+MTEL (8 clusters), TEL (6 clusters), INT (8 clusters), DTV (6 clusters)
+Assign clusters to df
+Summarize cluster profiles per service group
 
+🔢 Block 09: Final K-Modes clustering
+Map initial service clusters to descriptive names
+Final K-Modes clustering (modes = 11) using service cluster names
+Assign FINAL_CLUSTER and summarize cluster profiles
+Visualize cluster proportions
 
-📝 Preprocessing addresses missing data, duplicates, and outliers for robust clustering.
+🔢 Block 10: Demographics Analysis
+Replace NAs with "Unknown" for CUS_SEX, CUS_ZIP, CUS_LIFESTAGE, CUS_LIFESTAGE_DETAILS, LANGUAGE
+Gender, lifestage, lifestage details, language distribution per cluster
+Customer lifetime and revenue by cluster
+Visualizations:
+Lifestage distributions
+Lifetime boxplots
+Total revenue per cluster
 
-🔢 Block 3: Customer segmentation with K-Modes/KMeans
-
-📄 src/segmentation.py
-Apply K-Means or K-Modes clustering on behavioral and demographic features
-Optimal number of clusters selected via silhouette score or domain knowledge
-Resulting 11 clusters represent distinct usage and lifestyle segments
-
-📊 Outputs:
-clustered_customers.csv – processed dataset with cluster assignments
-Visualizations: distribution of usage and demographic variables per cluster
-
-💡 Example clusters:
-High usage, multi-product households
-Medium usage
-Zero/low usage
-
-🔢 Block 4: Demographic profiling
-
-📄 src/analysis.py
-
-Analyze gender distribution per cluster: 66–75% male, cluster 7 highest male share (75%)
-Lifestage distribution (Families, Mediors/Seniors, Young adults, Soho, Unknown)
-Subcategories: Families (-6, 6-12, 12-18, 18+), Seniors, Medior, Young adults
-
-🖼️ Figures:
-
-Figure 13: Lifestage proportion per cluster
-Figure 14: Detailed lifestage subcategories per cluster
-
-💡 Insight: clusters are reasonably balanced across gender and language; lifestage profiles inform marketing and product targeting.
-
-🔢 Block 5: Customer satisfaction analysis (NPS/Survey)
-
-📄 src/survey_analysis.py
-
-Aggregate survey responses per cluster
-Analyze Net Promoter Score (NPS) and service-specific satisfaction: internet, TV, mobile, fixed-line
-Identify risk segments and areas for improvement
-
-🖼️ Figures:
-
-Figure 15–20: Distribution of survey responses per cluster and per service
-Key insights:
-Majority are “Satisfied” or “Very Happy”
-High proportion of “Not Answered” for phone services
-Overall moderate satisfaction, no extreme negative clusters
-Price/quality dissatisfaction notable across most clusters
-
-🔢 Block 6: Marketing recommendations
-
-📄 src/marketing.py
-
-Focus on behavior-based targeting rather than generic demographic segmentation
-Key actionable segments:
-High usage multi-product households – up-sell and cross-sell opportunities
-Zero users – reactivation campaigns
-Low satisfaction segments – retention campaigns
-
-💡 Leverage lifestage and usage profiles for personalized offers and communications.
+🔢 Block 11: NPS / Customer Satisfaction
+Select survey columns (Q1_1 … Q5_1_1) from df_orig
+Merge FINAL_CLUSTER with survey data
+Bin Likert-scale responses into Dissatisfied, Satisfied, Very Happy, Not Answered
+Visualize distribution of each survey question by cluster
 
 ⚠️ Limitations
-
-Missing values: some survey and usage variables >60–70% missing
-Duplicates: multiple monthly records; only latest snapshot used
-Outliers: extreme usage values handled via binning
-Results reflect the current snapshot; temporal changes are not captured
+Missing values: some features >60–70% missing
+Duplicates handled by keeping latest snapshot
+Outliers handled via binning
+Temporal changes not captured; snapshot only
 
 ✅ Conclusion
 
-Behavioral segmentation based on usage data identifies 11 meaningful customer clusters
-Provides reliable basis for marketing, product targeting, and customer satisfaction strategies
-Segments clearly differentiate low, medium, and high usage profiles
-Methodology demonstrates practical application of data science in telecom sector
-Approach can be extended with predictive modeling or automation for higher business value
+Behavioral segmentation identifies 11 meaningful clusters
+K-Modes clustering applied per service and integrated into final clusters
+Demographics and NPS analysis provide actionable insights for marketing and product targeting
+Methodology can be extended with predictive modeling or automation
 
-📚 Dataset Sources
-
-Internal telecom usage logs, demographic data, and customer surveys
+📚 Dataset
+Internal telecom usage logs and surveys (Digital_2015_2016.RData)
